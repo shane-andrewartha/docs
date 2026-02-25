@@ -1,0 +1,50 @@
+#
+# C:\LAPTOP\DATA
+#
+* chrome_bookmarks_01_04_2025.html
+* edge_favourites_01_04_2025.html
+
+#
+# Installed on JDS0118
+#
+* Notepad++ "Compare plug-in" Settings> Preferences >Language >Tabs Replace by space: 3, Auto-complete: disable
+* MS Teams
+* Firefox - https://ninite.com
+* 7-Zip
+* Putty - https://www.chiark.greenend.org.uk/~sgtatham/putty/latest.html
+* WinSCP - https://winscp.net
+* Git bash client, https://git-scm.com/download/win
+* Razer keyboard/mouse
+
+#
+# Customer apps
+#
+* Coles is Citrix
+* Transurban was Amazon WorkSpaces
+
+#
+# Not installed
+#
+* Windows Terminal
+* VSCode
+* Google Drive for Desktop, G:\
+* Multipass, see Cheatsheets folder called 'dev vm (multipass, vscode)'
+* WSL (Windows Subsystem for Linux) cd ~ ; vi .vimrc Type in colorscheme slate :wq! (To view colorschemes in vi :colorscheme CTRL-d)
+
+#
+# Below is Splunk instance(s)
+#
+* G:\My Drive\.Splunk\Cheatsheets\install\
+
+  1. Windows Splunk Enterprise (SH/Indexer), Dev license = WIN_SH_IDXR_JDS0118 version:9.1.0.1
+      splunk-enterprise-(sh-inxdr)-on-win.txt
+
+  2. Windows Splunk UF
+      uf-on-win.txt
+
+  3. nix Splunk UF
+      uf-on-nix.txt
+
+  4. nix Splunk Enterprise (HF), HEC = 'NIX_HF_JDS0118' running Splunk version '8.2.10'
+      hf-on-wsl.txt
+      test-hec-on-nix.txt

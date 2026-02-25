@@ -1,0 +1,124 @@
+#
+# BACKGROUND
+#
+
+Full backup in 
+
+	Desktop/DATA/JDS-SAndrewar19
+
+Incremental backups look like
+
+	DATA/JDS0118/IncrementalBackup-2024-09-30
+
+What gets backed up is
+
+   Downloads
+   git
+   SplunkUF-etc-apps
+   SplunkWin-etc-apps
+   WSL
+
+Also important
+
+   How-to-backup-JDS-laptop.txt <-- This file itself.
+   Installed apps.txt
+
+Backup these manually (optional)
+
+   'Google Drive'               <-- Backup manually, to take a backup of jds's cloud
+   Users-sandrewartha           <-- Also backup manually, but you don't need most subfolders.
+
+
+How to make an incremental backup
+  
+   powershell.exe  							      <-- Run as... anybody
+   wsl -u root
+   cd ~
+   ls -al *backup*.sh							      <-- If they aren't on your laptop, try: find /mnt/c/Users/ShaneAndrewartha/Desktop/DATA/ -name backup*.sh -type f
+   														  or: find /mnt/c/Users/ShaneAndrewartha/Desktop/DATA/ -name WSL -type d
+   New laptop? Put them in place like this:
+   cp /mnt/c/Users/ShaneAndrewartha/Desktop/DATA/JDS0118/_Put\ these\ backup\ scripts\ in\ your\ WSL\ root\ home/backup*.sh .
+   ls -al backup*.sh
+
+Automation script is
+
+  *	root@JDS0118:~# crontab -l
+  *
+  *	Please check whether below has worked on Jul 1, 2024 ... or failed................... of course your laptop would have needed to be SWITCHED ON at midnight on that 1st of the month
+  *
+  *	0 0 1 * * ~/backup_jds_laptop_to_desktop_with_crontab.sh 2>~/backup_jds_laptop_to_desktop_with_crontab.err 1>~/backup_jds_laptop_to_desktop_with_crontab.log
+
+Steps are
+
+1. IncrementalBackup-2023-10-20/
+
+   mkdir /mnt/c/Users/ShaneAndrewartha/Desktop/DATA/JDS0118/IncrementalBackup-$(date '+%Y-%m-%d')
+
+2. Check date of last backup
+
+   # mkdir /mnt/c/Users/ShaneAndrewartha/Desktop/DATA/JDS0118/IncrementalBackup-$(date '+%Y-%m-%d')
+
+   *** Note - Needn't do this step after Jun 1, 2024: Script auto-replaces the string "May 2, 2024" with DATE OF LAST SUCCESSFUL BACKUP ***
+   	~/backup_inner_find_loop.sh
+	   SECOND_LAST=`ls -l /mnt/c/Users/ShaneAndrewartha/Desktop/DATA/JDS0118 --time-style='+%b %-d, %Y' | grep IncrementalBackup- | tail -2 | head -1 | awk '{print $6" "$7" "$8}'`
+	   LAST=`ls -l /mnt/c/Users/ShaneAndrewartha/Desktop/DATA/JDS0118 --time-style='+%b %-d, %Y' | grep IncrementalBackup- | tail -1 | awk '{print $6" "$7" "$8}'`
+	   sed -i 's/$SECOND_LAST/$LAST/g' tmp.tmp
+
+3. Backup of 1st folder (WinUF)
+
+   cd ~; ./backup_SplunkUFforWindows-etc-apps.sh   
+ 
+   You will at least have backed up 1 file in that IncrementalBackup folder, which is called __BACKED_UP___.txt
+
+4. To confirm it worked
+   
+   explorer C:\Users\ShaneAndrewartha\Desktop\DATA\JDS0118\    eg. IncrementalBackup-2024-05-02\SplunkUF-etc-apps
+   Open with... 7-zip > apps-2024-05-02.tgz > tar > tar > apps > __BACKED_UP___.txt will list out for your every file that you have backed up to your "DATA\JDS0118" folder
+
+5. Repeats for other Windows folders
+
+   backup_Downloads.sh
+   backup_git.sh
+   #backup_SplunkUFforWindows-etc-apps.sh
+   backup_SplunkEnterpriseForWindows-etc-apps.sh
+
+   backup_Google_Drive.sh                   <-- ls -al /mnt/g/'My Drive' ? this script is a bit broken, due to the space in 'My Drive' ... also last full backup of G-Drive is out of sync with others.
+   backup_Users-ShaneAndrewartha.sh         <-- Backup manually, because you don't need most subfolders: eg. git repo (or file therein)
+
+6. Full backup of WSL itself
+
+   ./backup_all_wsl.sh
+
+   How does it work
+    cat backup_home.sh
+
+   What is backed up
+    ls -dl ~/WSL*
+    Backing up root user home            --> WSL/home
+    Backing up shanea user home          --> WSL/shanea
+    Backing up splunk/etc/apps           --> WSL/splunk
+    Backing up splunkforwarder/etc/apps  --> WSL/splunkforwarder
+    Backing up /tmp/                     --> WSL/tmp
+
+7. Since your latest WSL*.tgz contains all files in all interesting WSL folders (on this laptop today) you may rm that OLDER tgz file.
+
+   Since your new git-2024-09-30.tgz now contains all git files currently on this laptop today, you could rm this OLDER file too:
+   /mnt/c/Users/ShaneAndrewartha/Desktop/DATA/JDS0118/IncrementalBackup-2024-06-01/git/git-2024-06-01.tgz
+
+8. Finally, check your Desktop folder      <-- Copy all of DATA to your new laptop = Your original full backup + all your incremental backups.
+
+    ls -al /mnt/c/Users/sandrewartha/Desktop/DATA/JDS0118/IncrementalBackup-2023-10-20/WSL/
+
+      i. Downloads
+     ii. git
+    iii. Splunk UF (Windows)
+     iv. Splunk Enterprise (Windows)
+      v. WSL
+     vi. G:\'My Drive'                     <-- Backup manually
+
+9. 'Google Drive'                           <-- Only needed if jds's g:\ is going to go bye-byes
+   ./backup_Google_Drive.sh                (does this script even work? yes it does 2024-11-06)
+
+10. Users-sandrewartha
+
+EOF
