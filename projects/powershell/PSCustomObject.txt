@@ -1,0 +1,40 @@
+PS C:\Users\sandrewartha> $someObject = New-Object PSObject
+PS C:\Users\sandrewartha> $someObject.GetType()
+
+IsPublic IsSerial Name                                     BaseType
+True     False    PSCustomObject                           System.Object
+
+
+PS C:\Users\sandrewartha> $someObject | Add-Member -MemberType NoteProperty -Name "Time" -Value "2023-07-11 1953" -Force
+PS C:\Users\sandrewartha> $someObject.GetType()
+
+IsPublic IsSerial Name                                     BaseType
+-------- -------- ----                                     --------
+True     False    PSCustomObject                           System.Object
+
+
+
+
+PS C:\Users\sandrewartha> $someObject | Add-Member -MemberType NoteProperty -Name "Message" -Value "Hello, World!" -Force
+PS C:\Users\sandrewartha> $someObject
+
+Time            Message
+----            -------
+2023-07-11 1953 Hello, World!
+
+
+
+# Okay what next ...
+
+
+| Select-Object
+
+| Sort-Object
+
+
+Other tricks
+https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.utility/select-object?view=powershell-7.3
+
+
+Example
+Get-Process | Sort-Object -Property WS | Select-Object -Last 5

@@ -1,0 +1,18 @@
+please give me an example of finding a specific line/name+value from
+Get-Variable
+I've tried all sorts of things with Select-String, Select-Object, tried ToString-ing stuff. Powershell is just painful
+
+
+
+PS C:\Program Files\SplunkUniversalForwarder> $myObject = $(Get-Variable -Scope Local)
+PS C:\Program Files\SplunkUniversalForwarder> $myObject.GetType()
+
+IsPublic IsSerial Name                                     BaseType
+-------- -------- ----                                     --------
+True     True     Object[]                                 System.Array
+
+
+PS C:\Program Files\SplunkUniversalForwarder> $($myObject | Where-Object Name -like 'splunkHome').Value
+C:\Program Files\SplunkUniversalForwarder
+
+

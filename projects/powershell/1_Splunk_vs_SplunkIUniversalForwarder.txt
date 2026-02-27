@@ -1,0 +1,16 @@
+echo $SplunkHome
+C:\Program Files\Splunk\SplunkUniversalForwarder
+
+cd $SplunkHome
+has seizure
+
+
+
+
+
+Did you mean
+
+PS C:\Users\sandrewartha> $SplunkHome="C:\Program Files\SplunkUniversalForwarder"
+PS C:\Users\sandrewartha> echo $SplunkHome
+C:\Program Files\SplunkUniversalForwarder
+PS C:\Users\sandrewartha> cd $SplunkHome

@@ -1,0 +1,308 @@
+# 
+# This script is being used to close off old OMi Events after removal of any Forwarding Info. ie. We will not notify the Connected Servers.
+#  Run as a user with access to the OMi Event database
+#
+# Example usage
+#  powershell.exe -ExecutionPolicy Bypass -File Close-EventWithoutBacksync.ps1 -Days_To_Keep:-60 -Row_Limit:2 -Verbose
+#
+# Depends on SQLQuery_PS_ForwardingInfo.ps1
+#
+# History of updates
+#  2018-12-03 C4759 No longer hardcoded to a single SQL server name. Converted to use AOAG name and port ("Always-On Availability Group")
+#  2018-07-02 IM51291 $Days_to_Keep now expects a positive integer
+#  2018-06-27 IM51291 Skip delete of row where forwarding_type like TRANSFER_CONTROL to stop OMi-to-HPSM sync logging a new IM at time of event closure
+#  2018-05-07 Bugfix for $howMany = $XmlDocument.event_list.count
+#  2017-11-28 No longer hardcoded to http://mtdhpomigw01.unisuper.lan and "METSQL24, 1439"
+#  2017-10-16 Swapped UPDATE statement to API call, add an annotation to the event instead of clobbering its description
+#  2017-10-13 Close the event, log what it looked like beforehand and afterwards
+#  2017-10-12 Update events to show this script has processed it, log at each step
+#  2017-10-11 Iterate event list, filter list down by receiveTime
+#  2017-10-10 Generate a list of active events
+#  2017-10-09 Creation date
+#
+
+# Run script with -Verbose for more output
+[cmdletbinding()]
+
+
+# PARAMETERS
+#########################################
+param (	[int] $DAYS_TO_KEEP = "365",	# Define how old is "too old" for an event to be left open
+	[int] $ROW_LIMIT = 10, 		# What is the maximum number of events you want to process in a single execution of this script, ie. 2 or more
+	[string] $Exe = "C:\HPBSM\opr\bin\RestWsUtil.bat",  # Example how we generate event_list
+	[string] $Args = "-read -output out_file.xml -verbose -username omirestuser -url `"https://opsbridge.unisuper.lan/opr-web/rest/event_list?page_size=10&order_by=time_received&order_direction=ascending&query=time_received LT 2017-08-22T17:00:00.000Z`"")	
+
+	#To avoid the -username -password option you can use another authentication method, for example java keystore or smartcard
+
+# FUNCTIONS
+############################################
+function Execute-Command
+{
+[cmdletbinding()]
+param( [string] $Exe = "hostname", [string] $Args = "" )
+
+  # Setup the Process startup info
+  $pinfo = New-Object System.Diagnostics.ProcessStartInfo
+  $pinfo.FileName = "$Exe"
+  if ($Args) {
+      $pinfo.Arguments = " $Args"
+  } else {
+      $pinfo.Arguments = ""
+  }
+  $pinfo.UseShellExecute = $false
+  $pinfo.CreateNoWindow = $true
+  $pinfo.RedirectStandardOutput = $true
+  $pinfo.RedirectStandardError = $true
+
+  # For debug
+  Write-Verbose -Message "           $Exe $Args"
+
+  # Create a process object using the startup info
+  $process = New-Object System.Diagnostics.Process
+  $process.StartInfo = $pinfo
+
+  # Start the process
+  try {
+    $rv = $process.Start() #| Out-Null
+  } catch {
+    Throw "$process.StandardError.ReadToEnd()"
+  }
+
+  # get output from stdout and stderr
+  if ("$rv") {
+     $stdout = "`n" + $process.StandardOutput.ReadToEnd() + $process.StandardError.ReadToEnd()
+     return "$($stdout)"
+  } else {
+     # return null
+  }
+}  
+
+function Update-Event
+{
+[cmdletbinding()]
+param( [string] $EventID = "" )
+	$sortableTimestamp = "{0:yyyy-MM-ddTHH:mm:ss}" -F $(Get-Date)
+	Write-Verbose -Message "$sortableTimestamp Processing event $($EventID)"
+
+	$SQLQUERY_SCRIPT = 'C:\ProgramData\HP\HPBTOS~1\bin\instrumentation\SQLQuery_PS_ForwardingInfo.ps1'
+	
+	# Annotate event
+	C:\HPBSM\opr\bin\RestWsUtil.bat -create C:\ProgramData\HP\HPBTOS~1\bin\instrumentation\Add-Annotation.xml -verbose -username omirestuser -password p@55w0rd -url "https://opsbridge.unisuper.lan/opr-web/rest/event_list/$($EventID)/annotation_list"
+
+	# Remove this event's forwarding record so it cannot notify Connected Servers on closure
+	Remove-ForwardingInfo -EventID:$($EventID)
+
+	# Close off event
+	C:\HPBSM\opr\bin\RestWsUtil.bat -update C:\ProgramData\HP\HPBTOS~1\bin\instrumentation\Close-Event.xml -verbose -username omirestuser -password p@55w0rd -url "https://opsbridge.unisuper.lan/opr-web/rest/event_list/$($EventID)"
+
+	# Postcheck
+	$sqlQuery = "SELECT id,state FROM omi_event.dbo.all_events WHERE id = `'$($EventID)`'"
+	C:\ProgramData\HP\HPBTOS~1\bin\instrumentation\SQLQuery_PS_ForwardingInfo.ps1 -sqlCommand:"$($sqlQuery)" -Datasource:"SQLAOAGUSMP1,1439"
+}
+
+function Remove-ForwardingInfo
+{
+[cmdletbinding()]
+param( [string] $EventID = "" )
+
+	# Remove the Forwarding Info from event   ######CAUTION: DISTRUCTIVE STATEMENT########
+	$sqlStatement = "DELETE FROM omi_event.dbo.event_forwarding_info WHERE event_id like `'$($EventID)`' AND forwarding_type not like `'SYNCHRONIZE_AND_TRANSFER_CONTROL`'"
+	Write-Host "                                  $($sqlStatement)"
+	Write-Verbose -Message "           SQLQuery_PS_ForwardingInfo.ps1 -sqlCommand:`"$($sqlStatement)`" -Datasource:`"SQLAOAGUSMP1,1439`""
+	C:\ProgramData\HP\HPBTOS~1\bin\instrumentation\SQLQuery_PS_ForwardingInfo.ps1 -sqlCommand:"$($sqlStatement)" -Datasource:"SQLAOAGUSMP1,1439"
+}
+
+
+# When older than N days
+function Remove-XmlFiles
+{
+[cmdletbinding()]
+param ()
+
+    [int] $MAX_AGE_IN_DAYS = -10
+    [string] $LOG_FOLDER = 'C:\ProgramData\HP\HPBTOS~1\log\'
+    
+    $MaxAge = "{0:yyyy-MM-ddTHH:mm:ss}" -F (Get-Date).AddDays($MAX_AGE_IN_DAYS)
+
+    #Write-Host Removing Close-EventWithoutBacksync_*.xml files under $LOG_FOLDER older than $MAX_AGE_IN_DAYS Days '('$MaxAge')'
+
+    foreach ( $file in (Get-ChildItem -Path $LOG_FOLDER -Recurse | Where-Object {$_.Name -like "Close-EventWithoutBacksync_*.xml"}) ) {
+        
+        # Further filtering of filename if desired
+        #if ($file.Name -like '*.xml') {
+
+              #Debug: displays all file names
+              #Write-Verbose -Message "                    Checking file age of $File.FullName"
+	  
+              if ( ($MaxAge) -gt ("{0:yyyy-MM-ddTHH:mm:ss}" -F $file.LastWriteTime) ) {
+                   #Debug: displays Last write time
+                   Write-Verbose -Message "                    Removing file: $($LOG_FOLDER)$File"
+                   Remove-item $File.FullName
+              }
+        #}
+    }
+}
+
+# MAIN METHOD
+############################################
+
+try {
+
+	# Start of main() method
+	############################################
+	# User of this script can use %ERRORLEVEL% return codes to detect an unclean exit
+	[int] $tellCaller = 0
+
+	# Looking up this script's name
+	$scriptName = ($MyInvocation.MyCommand.Definition).split('\\')[-1]
+
+	# Getting timestamp for output
+	# Eg. 2017-10-10T21:57:22.000Z
+	$sortableTimestamp = "{0:yyyy-MM-ddTHH:mm:ss}" -F $(Get-Date)
+	Write-Output "$sortableTimestamp $scriptName has begun"
+
+	# Show local PowerShell version
+	$verNum = [string] $PSVersionTable.PSVersion
+	$execPol = Get-ExecutionPolicy
+	Write-Verbose -Message "           PowerShell V$VerNum, ExecutionPolicy $execPol"
+
+	# Check if -Verbose and or -Debug have been specified by the caller
+	if (-Not ($VerbosePreference -like 'SilentlyContinue')) {
+		Write-Verbose -Message "           Verbose switch was specified ($VerbosePreference)"
+	} else {
+		Write-Output "                    Verbose output is off. VerbosePreference is $VerbosePreference"
+	}
+	if (-Not ($DebugPreference -like 'SilentlyContinue')) {
+		Write-Verbose -Message "           Debug switch was specified. Debug logging is on ($DebugPreference)"
+	} else {
+		Write-Verbose -Message "           Debug output is off. DebugPreference is $DebugPreference"
+	}
+
+
+
+	# YOUR CODE HERE
+	############################################
+	# Initialise output file name, Eg. Close-EventWithoutNotifying_2017-10-12-145700.xml
+	$Outfile_XML = "C:\ProgramData\HP\HPBTOS~1\log\" + "$($scriptName)".split(".")[-2] + "_" + "{0:yyyy-MM-ddTHHmmss}" -F $(Get-Date) + ".xml"
+
+	# Show what we are about to do
+	$sortableTimestamp = "{0:yyyy-MM-ddTHH:mm:ss}" -F $(Get-Date)
+	Write-Output "$sortableTimestamp Executing $($Exe)"
+
+	# We need to work in UTC/GMT
+	# The API cannot handle the + and the .bat file cannot handle escape its code %2B, therefore we use GMT/UTC timezone which is why you see the Z character at the end
+	#Eg. 2017-10-10T17:00:00.000Z
+	$DAYS_TO_KEEP = $DAYS_TO_KEEP * -1
+	$thresholdTimestamp_UTC = "{0:yyyy-MM-ddTHH:mm:ss}" -F $((Get-Date).ToUniversalTime().AddDays($DAYS_TO_KEEP)) + ".000Z"
+
+	# Parameters can be passed in to this script
+	if (-Not $($Exe))
+	{
+		# Use default values
+		$Exe = "C:\HPBSM\opr\bin\RestWsUtil.bat"
+		$Args = "-read -output $($Outfile_XML) -verbose -username omirestuser -url `"https://opsbridge.unisuper.lan/opr-web/rest/event_list?page_size=$($ROW_LIMIT)&order_by=time_received&order_direction=ascending&query=time_received LT $($thresholdTimestamp_UTC)`""
+	}
+
+	# In devtest we use admin password
+	if ("$Args" -match "admin") {
+		Write-Output "$($Args) -password ********"
+		Write-Verbose -Message "           To avoid the -password command option you can use another authentication method, for example java keystore or smartcard."
+		$ArgsWithPasswd= "$($Args)" + ' -password p@55w0rd'
+	} else {
+		# Show parameters passed in from the outside world
+		Write-Output "                    $($Args)"
+	}
+
+	$rv = Execute-Command -Exe:"C:\HPBSM\opr\bin\RestWsUtil.bat" -Args:"-read -output $($Outfile_XML) -verbose -username omirestuser -password p@55w0rd -url `"https://opsbridge.unisuper.lan/opr-web/rest/event_list?page_size=$($ROW_LIMIT)&order_by=time_received&order_direction=ascending&query=time_received LT $($thresholdTimestamp_UTC)`""
+
+	# Show took time
+	$sortableTimestamp = "{0:yyyy-MM-ddTHH:mm:ss}" -F $(Get-Date)
+	Write-Output "$sortableTimestamp Completed $($Exe)"
+
+	# Check return value for error
+	Write-Verbose -Message "           Return value: $($rv)"
+
+	if ( -Not ("$rv" -match "ERROR:") ) {
+		Write-Verbose -Message "You can ignore the warning message WARN: Default virtual gateway server URL isn`'t a valid URL.: java.net.MalformedURLException -- java.lang.NullPointerException"
+		Write-Verbose -Message "           Command completed ok."
+	}else {
+		# Show error, and throw exception to the main() try-catch block to handle
+		$sortableTimestamp = "{0:yyyy-MM-ddTHH:mm:ss}" -F $(Get-Date)
+		Write-Output "$sortableTimestamp Command has not terminated successfully: $($Exe) $($Args)"
+		Throw "Execute-Command Exception. Check your inputs and password: $($Exe) $($Args)"
+	}
+
+	# Check output file exists for us to process
+	if (Test-Path "$($Outfile_XML)")
+	{
+		Write-Output "                    Found output file $Outfile_XML"
+
+		# Read in file as object System.Xml.XmlDocument
+		[xml] $XmlDocument = Get-Content "$($Outfile_XML)"
+		[int] $howMany = $XmlDocument.event_list.total_size
+
+		Write-Output "                    Found $howMany events to process. The limit is set to $ROW_LIMIT."
+
+		# Loop for each event
+		[int] $i = 0
+		foreach($event in $XmlDocument.event_list.event) 
+		{
+			# For debug
+			#Write-Output "Processing event with ID:$event.id "
+
+			# This event
+			$EventID = $XmlDocument.event_list.event.id[$i]
+
+			# Event details
+			$timeReceived = $XmlDocument.event_list.event.time_received[$i]
+			$state = $XmlDocument.event_list.event.state[$i]
+			$dupCount = $XmlDocument.event_list.event.duplicate_count[$i]
+			$title = $XmlDocument.event_list.event.title[$i]
+
+			# Trim long title
+			if ($title.Length -gt 1) {
+
+				# Looks like we found a genuine event, let's proceed
+				$title = $($title).Substring(0, [System.Math]::Min(30, $title.Length))
+
+				# Show event we are about to process
+				if ($i -lt 10) {
+					Write-Host "                    Event  $($i)/$howMany ID:$($EventID)  $state Received:$timeReceived Dups:$dupCount Title:$title"
+				} else {
+					Write-Host "           Event $($i)/$howMany ID:$($EventID)  $state Received:$timeReceived Dups:$dupCount Title:$title"
+				}
+
+				# Update this event
+				$rv = Update-Event -EventID:"$($EventID)"
+			}
+
+			# End of loop
+			$i++
+		}
+
+        # When older than 10 days
+        Remove-XmlFiles
+		
+	} else {
+		Throw "File not found $Outfile_XML"
+	}
+
+
+	# End of main() method
+	############################################
+
+	# Show took time
+	$sortableTimestamp = "{0:yyyy-MM-ddTHH:mm:ss}" -F $(Get-Date)
+	Write-Output "$sortableTimestamp $scriptName has finished"
+
+
+	# We exit cleanly here ie. with exit 0
+
+
+} # End try block
+catch {
+	Write-Error "Exception caught: $_.Exception.Message"
+
+	# Tell the caller we have aborted
+	if (-Not $?) { exit 1 }
+}

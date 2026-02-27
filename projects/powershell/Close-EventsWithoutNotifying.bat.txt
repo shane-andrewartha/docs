@@ -1,0 +1,12 @@
+:
+:Triggered by OMi Policy
+:
+:Name: CloseOMiEventsWithoutNotifying
+:Type: Scheduled Task
+:
+
+:OMi Policy version 1.6 circa 2017-11-28
+powershell.exe -ExecutionPolicy Bypass -File C:\ProgramData\HP\HPBTOS~1\bin\instrumentation\Close-EventWithoutBacksync.ps1 -Days_To_Keep:100 -Row_Limit:100 >>C:\ProgramData\HP\HPBTOS~1\log\Close-EventsWithoutNotifying.log 2>C:\ProgramData\HP\HPBTOS~1\log\Close-EventsWithoutNotifying_Error.log
+
+:OMi Policy version 1.7 circa 2018-06-29
+:powershell.exe -ExecutionPolicy Bypass -File C:\ProgramData\HP\HPBTOS~1\bin\instrumentation\Close-EventWithoutBacksync.ps1 -Days_To_Keep:%1 -Row_Limit:%2 >>C:\ProgramData\HP\HPBTOS~1\log\Close-EventsWithoutNotifying.log 2>C:\ProgramData\HP\HPBTOS~1\log\Close-EventsWithoutNotifying_Error.log

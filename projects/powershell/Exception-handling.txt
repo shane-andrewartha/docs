@@ -1,0 +1,61 @@
+In 3 parts.....
+
+
+
+
+
+1. When you're inside a function do your own try-catch. Then you can decide whether to ignore or throw.
+
+function Set-Datetime {
+  param( [string] $Filename )
+
+     try {
+         # Current time, Eg. '2017-09-05T15:20:42'
+         "{0:yyyy-MM-ddTHH:mm:ss.000}" -F $(Get-Date) | Out-File "$Filename"
+     }
+     catch {
+         return 1  # write error
+     }
+
+  return 0  # ok
+}
+
+
+
+
+
+
+2. If you want to quit when you encounter an expected or unexpected error/exception then
+
+        # We handle SQLExceptions like this
+        Trap [System.Data.SqlClient.SqlException] {
+                Write-Output "A SQL Exception occurred: `n" + $_.Exception.Message
+                break
+        }
+        # We handle all other exceptions like this
+        Trap  {
+                Write-Output "A General Exception occurred: `n" + $_.Exception.Message
+                break
+        }
+
+
+
+
+
+
+
+3. Your main method then only needs a try-catch around everything
+
+try {
+
+### Your code here ###
+
+Exit 0  # always exit cleanly here
+
+}
+catch {
+
+    # Must not exit 0 if we threw an exception in the main method (and or left it unhandled by one of its function calls)
+    Exit 1
+}
+

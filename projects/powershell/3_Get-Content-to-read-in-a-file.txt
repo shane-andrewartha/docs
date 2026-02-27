@@ -1,0 +1,40 @@
+why
+$s="C:\Program Files\SplunkUniversalForwarder\etc\apps\NSWH_Apache_Config\default\inputs.conf"
+Select-String -Pattern 'script' -Path $s
+
+Doesn't work.
+
+
+
+
+
+PS C:\Users\sandrewartha> $s="C:\Program Files\SplunkUniversalForwarder\etc\apps\NSWH_Apache_Config\default\inputs.conf"
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha> Select-String -Pattern 'NSW' -Path $s
+
+C:\Program Files\SplunkUniversalForwarder\etc\apps\NSWH_Apache_Config\default\inputs.conf:2:[script://.\bin\powershell_dir_win_folder.cmd "C:\Mounts\Data\Axway\Integriti\NSW\Archive"]
+
+
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha> Select-String -Pattern 'VIC' -Path $s
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+
+
+Below is clearer
+
+PS C:\Users\sandrewartha> $myFile = Get-Content "C:\Program Files\SplunkUniversalForwarder\etc\apps\NSWH_Apache_Config\default\inputs.conf"
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha> $which_script = $($myFile | Select-String -Pattern 'script')
+PS C:\Users\sandrewartha>
+PS C:\Users\sandrewartha> echo $which_script
+
+[script://.\bin\powershell_dir_win_folder.cmd "C:\Mounts\Data\Axway\Integriti\NSW\Archive"]
