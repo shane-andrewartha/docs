@@ -1,0 +1,13 @@
+There is a lot of junk in 
+C:\Users\Shane.Andrewartha\OneDrive - AC3\Documents\.Splunk\Cheatsheets\
+
+  Keep
+	1.	*.txt				Keep when accessed recently then 
+		*.xml
+
+  Unsure 
+	2.	*.doc*
+
+	3.	*.PNG
+
+	4.	Other
